@@ -3,7 +3,7 @@ resources:
   type: GitRepo
   configuration:
     path: MaharshiPatel/simple-nodejs-weather-app
-    gitProvider: github_MaharshiPatel_simple_nodejs_weather_app_integration
+    gitProvider: GITHUB_MPATEL
     buildOn:
       pullRequestCreate: true
     branches:
