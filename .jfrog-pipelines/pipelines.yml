@@ -1,44 +1,64 @@
-valuesFilePath: ./values.yml
-
 resources:
-  - name: weather-app-source
-    type: GitRepo
-    configuration:
-      # SCM integration where the repository is located
-      gitProvider: {{ .Values.myRepo.gitProvider }}
-      # Repository path, including org name/repo name
-      path: {{ .Values.myRepo.path }}
-      branches:
-        # Specifies which branches will trigger dependent steps
-        include: master
-
-  - name: weather-app-buildinfo
-    type: BuildInfo
-    configuration:
-      sourceArtifactory: {{ .Values.myRepo.artifactory }}  
-
+- name: MaharshiPatel_simple_nodejs_weather_app_gitResource
+  type: GitRepo
+  configuration:
+    path: MaharshiPatel/simple-nodejs-weather-app
+    gitProvider: GITHUB_MPATEL
+    buildOn:
+      pullRequestCreate: true
+    branches:
+      include: master
+- name: MaharshiPatel_simple_nodejs_weather_app_buildInfoResource
+  type: BuildInfo
+  configuration:
+    sourceArtifactory: rt_MaharshiPatel_simple_nodejs_weather_app_integration
+    buildName: simple-nodejs-weather-app-master
+    buildNumber: $run_number
 pipelines:
-  - name: Npm_Quickstart
-    steps:
-      - name: npm_build_step
-        type: NpmBuild
-        configuration:
-          repositoryName: dashboard-npm-virtual      # required, npm repository name on artifacctory
-          sourceLocation: .      # required, location of package.json file
-          integrations:
-            - name:  {{ .Values.myRepo.artifactory }}  # required
-          inputResources:
-            - name: weather-app-source         # required
-
-      - name: npm_publish_step
-        type: NpmPublish
-        configuration:
-          # for payloadType npm:
-          repositoryName: dashboard-npm-virtual        # required, npm repository name on artifactory
-          autoPublishBuildInfo: true       # optional
-          integrations:
-            - name: {{ .Values.myRepo.artifactory }}      # required
-          inputSteps:
-            - name: npm_build_step                # required
-          outputResources:
-            - name: weather-app-buildinfo                 # optional
+- name: MaharshiPatel_simple_nodejs_weather_app_pipeline
+  configuration:
+    environmentVariables:
+      readOnly:
+        CI: "true"
+        JFROG_CLI_BUILD_NAME: simple-nodejs-weather-app-master
+        JFROG_CLI_BUILD_NUMBER: $run_number
+        JFROG_CLI_BUILD_URL: $step_url
+  steps:
+  - name: NpmBuildStep
+    type: Bash
+    configuration:
+      environmentVariables:
+        JFROG_BUILD_STATUS: PASS
+      integrations:
+      - name: rt_MaharshiPatel_simple_nodejs_weather_app_integration
+      inputResources:
+      - name: MaharshiPatel_simple_nodejs_weather_app_gitResource
+    execution:
+      onExecute:
+      - cd $res_MaharshiPatel_simple_nodejs_weather_app_gitResource_resourcePath
+      - jfrog rt c MaharshiPatel_simple_nodejs_weather_app_serverId --url $int_rt_MaharshiPatel_simple_nodejs_weather_app_integration_url
+        --user $int_rt_MaharshiPatel_simple_nodejs_weather_app_integration_user --enc-password=false
+      - jfrog rt npm-config --server-id-resolve MaharshiPatel_simple_nodejs_weather_app_serverId
+        --repo-resolve sup016-npm-virtual
+      - jfrog rt npmi
+      - jfrog rt bag
+      - jfrog rt bce
+      onComplete:
+      - add_run_files /tmp/jfrog/. jfrog
+      onFailure:
+      - export JFROG_BUILD_STATUS=FAIL
+      - jfrog rt bce
+      - jfrog rt bp
+  - name: PublishBuildInfoStep
+    type: PublishBuildInfo
+    configuration:
+      inputResources:
+      - name: MaharshiPatel_simple_nodejs_weather_app_gitResource
+      outputResources:
+      - name: MaharshiPatel_simple_nodejs_weather_app_buildInfoResource
+      inputSteps:
+      - name: NpmBuildStep
+      forceXrayScan: true
+    execution:
+      onComplete:
+      - update_commit_status MaharshiPatel_simple_nodejs_weather_app_gitResource
